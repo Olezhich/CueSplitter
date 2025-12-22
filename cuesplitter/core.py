@@ -24,7 +24,6 @@ def split_album(cue_path: Path, output_dir: Path):
     for track in album.tracks:
         output_file = output_dir / f'{track.track:02d} - {track.title}.flac'
 
-        # ffmpeg -ss start -t duration -i input.flac -c copy output.flac
         cmd = [
             'ffmpeg',
             '-ss',
@@ -33,8 +32,7 @@ def split_album(cue_path: Path, output_dir: Path):
             str(track.duration),
             '-i',
             str(track.file),
-            '-c',
-            'copy',
+            '-c:a', 'flac',
             str(output_file),
             '-y',
         ]
@@ -45,5 +43,4 @@ def split_album(cue_path: Path, output_dir: Path):
         output_paths.append(output_file)
 
     return output_paths
-
 
