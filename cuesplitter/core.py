@@ -1,11 +1,8 @@
 from pathlib import Path
 import subprocess
 import cuetools
-import logging
 
 from cuesplitter.models import Album
-
-logger = logging.getLogger(__name__)
 
 
 def split_album(cue_path: Path, output_dir: Path):
@@ -15,8 +12,7 @@ def split_album(cue_path: Path, output_dir: Path):
         try:
             album = Album.from_album_data(cuetools.load(cue), cue_dir)
         except (cuetools.CueParseError, cuetools.CueValidationError) as e:
-            logger.error(e)
-            return
+            raise e
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -32,7 +28,8 @@ def split_album(cue_path: Path, output_dir: Path):
             str(track.duration),
             '-i',
             str(track.file),
-            '-c:a', 'flac',
+            '-c:a',
+            'flac',
             str(output_file),
             '-y',
         ]
@@ -43,4 +40,3 @@ def split_album(cue_path: Path, output_dir: Path):
         output_paths.append(output_file)
 
     return output_paths
-
