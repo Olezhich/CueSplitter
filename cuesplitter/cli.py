@@ -13,6 +13,7 @@ app = typer.Typer()
 stdout = Console()
 stderr = Console(stderr=True)
 
+
 @app.command()
 def split(input: Path, output: Path = Path(), dry: bool = False):
     """
@@ -25,15 +26,14 @@ def split(input: Path, output: Path = Path(), dry: bool = False):
                 stdout.print(track)
         else:
             split_album(input, output)
-    except (CueValidationError) as e:
+    except CueValidationError as e:
         stderr.print('[bold red]Cue validation error:[/bold red]')
         stderr.print(str(e))
         raise typer.Exit(code=1)
-    except (CueParseError) as e:
+    except CueParseError as e:
         stderr.print('[bold red]Cue parse error:[/bold red]')
         stderr.print(str(e))
         raise typer.Exit(code=1)
-
 
 
 if __name__ == '__main__':
