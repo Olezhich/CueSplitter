@@ -42,9 +42,9 @@ def set_tags(track_path: Path, album: Album, track: Track, cover_path: Path) -> 
 
     picture = Picture()
     picture.type = PictureType.OTHER
-    picture.mime = "image/jpeg"
-    picture.desc = "Front Cover"
-    with open(cover_path, "rb") as cover:
+    picture.mime = 'image/jpeg'
+    picture.desc = 'Front Cover'
+    with open(cover_path, 'rb') as cover:
         picture.data = cover.read()
 
     f.add_picture(picture)
