@@ -5,17 +5,17 @@ import cuetools
 from cuesplitter.models import Album
 
 
-def parse_album(cue_path: Path) -> Album:
+def parse_album(cue_path: Path, strict_title_case: bool) -> Album:
     cue_dir = cue_path.parent
 
     with open(cue_path, 'r') as cue:
-        album = Album.from_album_data(cuetools.load(cue), cue_dir)
+        album = Album.from_album_data(cuetools.load(cue, strict_title_case), cue_dir)
 
     return album
 
 
-def split_album(cue_path: Path, output_dir: Path):
-    album = parse_album(cue_path)
+def split_album(cue_path: Path, output_dir: Path, strict_title_case: bool):
+    album = parse_album(cue_path, strict_title_case)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 

@@ -15,13 +15,13 @@ stderr = Console(stderr=True)
 
 
 @app.command()
-def split(input: Path, output: Path = Path(), dry: bool = False):
+def split(input: Path, output: Path = Path(), strict: bool = False, dry: bool = False):
     """
     Split album on different tracks by `.cue` file
     """
     try:
         if dry:
-            album = parse_album(input)
+            album = parse_album(input, strict)
             for track in album.tracks:
                 stdout.print(track)
         else:
