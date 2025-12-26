@@ -30,7 +30,7 @@ class Album(AlbumData):
         tracks = []
         duration: float
         offset: float | None = None
-        for track_cue in sorted(album.tracks, reverse=True, key=lambda x: x.track):  # type: ignore
+        for track_cue in sorted(album.tracks, reverse=True, key=lambda x: x.track):
             offset, duration = _get_offset_duration(str(base_dir), track_cue, offset)
             tracks.append(Track.from_track_data(track_cue, base_dir, duration, offset))
 
