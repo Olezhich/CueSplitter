@@ -25,7 +25,7 @@ def split(input: Path, output: Path = Path(), strict: bool = False, dry: bool = 
             for track in album.tracks:
                 stdout.print(track)
         else:
-            split_album(input, output)
+            split_album(input, output, strict)
     except CueValidationError as e:
         stderr.print('[bold red]Cue validation error:[/bold red]')
         stderr.print(str(e))
