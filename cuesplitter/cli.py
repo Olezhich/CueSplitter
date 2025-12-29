@@ -1,5 +1,5 @@
 from pathlib import Path
-from cuesplitter.core import split_album, parse_album
+from cuesplitter.core import split_album, join_album
 
 from cuetools import CueParseError, CueValidationError
 
@@ -20,12 +20,9 @@ def split(input: Path, output: Path = Path(), strict: bool = False, dry: bool = 
     Split album on different tracks by `.cue` file
     """
     try:
-        if dry:
-            album = parse_album(input, strict)
-            for track in album.tracks:
-                stdout.print(track)
-        else:
-            split_album(input, output, strict)
+        out = sorted(split_album(input, output, strict, dry))
+        for path in out:
+            stdout.print(path, end='\0')
     except CueValidationError as e:
         stderr.print('[bold red]Cue validation error:[/bold red]')
         stderr.print(str(e))
@@ -34,6 +31,26 @@ def split(input: Path, output: Path = Path(), strict: bool = False, dry: bool = 
         stderr.print('[bold red]Cue parse error:[/bold red]')
         stderr.print(str(e))
         raise typer.Exit(code=1)
+
+
+@app.command()
+def join(
+    tracks: list[Path],
+    output: Path = Path('joined.flac'),
+):
+    """
+    Join tracks  into a single album file
+    """
+    if not tracks:
+        stderr.print('Error: No input tracks provided.')
+        raise typer.Exit(1)
+
+    for p in tracks:
+        if not p.exists():
+            stderr.print(f'Error: File not found: {p}')
+            raise typer.Exit(1)
+
+    join_album(tracks, output)
 
 
 if __name__ == '__main__':
