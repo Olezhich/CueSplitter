@@ -62,9 +62,11 @@ def split_album(cue_path: Path, output_dir: Path, strict_title_case: bool, dry: 
 
     output_paths = []
     for track in album.tracks:
-        output_file = output_dir / f'{track.track:02d}'
+        file_name = f'{track.track:02d}'
         if track.title:
-            output_file = output_file / f' - {track.title.replace("'", "")}.flac'
+            file_name += f' - {track.title.replace("'", "")}.flac'
+
+        output_file = output_dir / file_name
 
         cmd = [
             'ffmpeg',
@@ -107,8 +109,8 @@ def join_album(tracks: list[Path], output: Path) -> None:
             '0',
             '-i',
             filelist,
-            '-c',
-            'copy',
+            '-c:a',
+            'flac',
             '-f',
             'flac',
             str(output.resolve()),
