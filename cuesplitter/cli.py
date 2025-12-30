@@ -7,6 +7,10 @@ import typer
 
 from rich.console import Console
 
+import asyncio
+
+import time
+
 
 app = typer.Typer()
 
@@ -15,12 +19,22 @@ stderr = Console(stderr=True)
 
 
 @app.command()
-def split(input: Path, output: Path = Path(), strict: bool = False, dry: bool = False):
+def split(
+    input: Path,
+    output: Path = Path(),
+    strict: bool = False,
+    dry: bool = False,
+    workers: int = 1,
+    timer: bool = False,
+):
     """
     Split album on different tracks by `.cue` file
     """
+    t1 = time.time()
+
     try:
-        out = sorted(split_album(input, output, strict, dry))
+        result = asyncio.run(split_album(input, output, strict, dry, workers))
+        out = sorted(result)
         for path in out:
             stdout.print(path, end='\0')
     except CueValidationError as e:
@@ -31,6 +45,9 @@ def split(input: Path, output: Path = Path(), strict: bool = False, dry: bool = 
         stderr.print('[bold red]Cue parse error:[/bold red]')
         stderr.print(str(e))
         raise typer.Exit(code=1)
+    if timer:
+        t2 = time.time()
+        stdout.print(f'[bold green]{(t2 - t1)}[/bold green]')
 
 
 @app.command()

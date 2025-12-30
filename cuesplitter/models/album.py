@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
 from pathlib import Path
 from cuetools import TrackData, AlbumData
 
@@ -28,12 +26,14 @@ class Album(AlbumData):
     tracks: list[Track]  # type: ignore
 
     @classmethod
-    def from_album_data(cls, album: AlbumData, base_dir: Path) -> Album:
+    async def from_album_data(cls, album: AlbumData, base_dir: Path) -> Album:
         tracks = []
         duration: float
         offset: float | None = None
         for track_cue in sorted(album.tracks, reverse=True, key=lambda x: x.track):
-            offset, duration = _get_offset_duration(str(base_dir), track_cue, offset)
+            offset, duration = await _get_offset_duration(
+                str(base_dir), track_cue, offset
+            )
             tracks.append(Track.from_track_data(track_cue, base_dir, duration, offset))
 
         parent = album.model_dump()
@@ -42,7 +42,7 @@ class Album(AlbumData):
         return cls(**parent)
 
 
-def _get_offset_duration(
+async def _get_offset_duration(
     current_dir: str, track_cue: TrackData, next_offset: float | None
 ) -> tuple[float, float]:
     offset = 0.0
@@ -53,10 +53,10 @@ def _get_offset_duration(
     duration = (
         next_offset - offset
         if next_offset is not None
-        else get_audiofile_duration(current_dir / track_cue.file) - offset
+        else await get_audiofile_duration(current_dir / track_cue.file) - offset
     )
     return offset, duration
 
 
-def get_audiofile_duration(path_to_file: Path) -> float:
-    return asyncio.run(get_duration(path_to_file))
+async def get_audiofile_duration(path_to_file: Path) -> float:
+    return await get_duration(path_to_file)
