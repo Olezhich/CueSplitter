@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import os
+import asyncio
+
 from pathlib import Path
-import subprocess
 from cuetools import TrackData, AlbumData
+
+from cuesplitter.ffmpeg import get_duration
 
 
 class Track(TrackData):
@@ -51,27 +53,10 @@ def _get_offset_duration(
     duration = (
         next_offset - offset
         if next_offset is not None
-        else get_audiofile_duration(os.path.join(current_dir, track_cue.file)) - offset
+        else get_audiofile_duration(current_dir / track_cue.file) - offset
     )
     return offset, duration
 
 
-def get_audiofile_duration(path_to_file: str) -> float:
-    DurationCmd = [
-        'ffprobe',
-        '-v',
-        'error',
-        '-show_entries',
-        'format=duration',
-        '-of',
-        'default=nw=1:nokey=1',
-        '{path_to_file}',
-    ]
-
-    result = subprocess.run(
-        [arg.replace('{path_to_file}', path_to_file) for arg in DurationCmd],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-    return float(result.stdout.strip())
+def get_audiofile_duration(path_to_file: Path) -> float:
+    return asyncio.run(get_duration(path_to_file))

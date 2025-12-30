@@ -8,6 +8,8 @@ from mutagen.flac import FLAC
 from mutagen.flac import Picture
 from mutagen.id3 import PictureType
 
+import tempfile
+
 
 def parse_album(cue_path: Path, strict_title_case: bool) -> Album:
     cue_dir = cue_path.parent
@@ -52,14 +54,19 @@ def set_tags(track_path: Path, album: Album, track: Track, cover_path: Path) -> 
     f.save()
 
 
-def split_album(cue_path: Path, output_dir: Path, strict_title_case: bool):
+def split_album(cue_path: Path, output_dir: Path, strict_title_case: bool, dry: bool):
     album = parse_album(cue_path, strict_title_case)
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if not dry:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     output_paths = []
     for track in album.tracks:
-        output_file = output_dir / f'{track.track:02d} - {track.title}.flac'
+        file_name = f'{track.track:02d}'
+        if track.title:
+            file_name += f' - {track.title.replace("'", "")}.flac'
+
+        output_file = output_dir / file_name
 
         cmd = [
             'ffmpeg',
@@ -74,12 +81,43 @@ def split_album(cue_path: Path, output_dir: Path, strict_title_case: bool):
             str(output_file),
             '-y',
         ]
-        result = subprocess.run(cmd, stderr=subprocess.PIPE)
-        if result.returncode != 0:
-            raise RuntimeError(f'ffmpeg failed with copy: {result.stderr.decode()}')
+        if not dry:
+            result = subprocess.run(cmd, stderr=subprocess.PIPE)
 
-        set_tags(output_file, album, track, cue_path.parent / 'Front.jpeg')
+            if result.returncode != 0:
+                raise RuntimeError(f'ffmpeg failed with copy: {result.stderr.decode()}')
 
-        output_paths.append(output_file)
+            set_tags(output_file, album, track, cue_path.parent / 'Front.jpeg')
+
+        output_paths.append((output_file).resolve())
 
     return output_paths
+
+
+def join_album(tracks: list[Path], output: Path) -> None:
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        for p in tracks:
+            safe_path = p.resolve().as_posix()
+            f.write(f"file '{safe_path}'\n")
+        filelist = f.name
+    try:
+        cmd = [
+            'ffmpeg',
+            '-f',
+            'concat',
+            '-safe',
+            '0',
+            '-i',
+            filelist,
+            '-c:a',
+            'flac',
+            '-f',
+            'flac',
+            str(output.resolve()),
+            '-y',
+        ]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            raise RuntimeError(f'ffmpeg failed:\n{result.stderr.decode()}')
+    finally:
+        Path(filelist).unlink()
