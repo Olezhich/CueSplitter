@@ -6,12 +6,12 @@ import cuetools
 from cuesplitter.models import Album, Track
 
 from mutagen.flac import FLAC
-from mutagen.flac import Picture
-from mutagen.id3 import PictureType
+# from mutagen.flac import Picture
+# from mutagen.id3 import PictureType
 
 import tempfile
 
-from cuesplitter.ffmpeg import extract_track
+from cuesplitter.ffmpeg import extract_track, join_tracks, get_raw_pcm, cmp_raw_pcm
 
 
 async def parse_album(cue_path: Path, strict_title_case: bool) -> Album:
@@ -47,14 +47,14 @@ def set_tags(track_path: Path, album: Album, track: Track, cover_path: Path) -> 
         f['TITLE'] = track.title
     f['TRACKNUMBER'] = f'{track.track:02d}'
 
-    picture = Picture()
-    picture.type = PictureType.OTHER
-    picture.mime = 'image/jpeg'
-    picture.desc = 'Front Cover'
-    with open(cover_path, 'rb') as cover:
-        picture.data = cover.read()
+    # picture = Picture()
+    # picture.type = PictureType.OTHER
+    # picture.mime = 'image/jpeg'
+    # picture.desc = 'Front Cover'
+    # with open(cover_path, 'rb') as cover:
+    #     picture.data = cover.read()
 
-    f.add_picture(picture)
+    # f.add_picture(picture)
 
     f.save()
 
@@ -94,9 +94,10 @@ async def split_album(
     cue_path: Path,
     output_dir: Path,
     strict_title_case: bool,
-    dry: bool,
     num_workers: int,
-):
+    dry: bool,
+    verify: bool,
+) -> list[Path]:
     album = await parse_album(cue_path, strict_title_case)
     cue_dir = cue_path.parent
 
@@ -123,6 +124,14 @@ async def split_album(
         await queue.put(None)
 
     await asyncio.gather(*workers)
+
+    output_paths = sorted(output_paths)
+
+    if verify and len(album.tracks) > 0:
+        res = await verify_album(output_paths, album.tracks[0].file, num_workers)
+        print('VERIFI_RESULT:', res)
+        # if not res:
+        #     raise RuntimeError('Not bit-perfect')
 
     return output_paths
 
@@ -154,3 +163,56 @@ def join_album(tracks: list[Path], output: Path) -> None:
             raise RuntimeError(f'ffmpeg failed:\n{result.stderr.decode()}')
     finally:
         Path(filelist).unlink()
+
+
+async def raw_pcm_handler(queue: asyncio.Queue[tuple[Path, Path] | None]) -> None:
+    while True:
+        item = await queue.get()
+        try:
+            if not item:
+                break
+
+            input, output = item
+
+            await get_raw_pcm(input, output)
+        finally:
+            queue.task_done()
+
+
+async def verify_album(tracks: list[Path], original: Path, num_workers) -> bool:
+    result = False
+
+    with (
+        tempfile.NamedTemporaryFile(delete=True) as rhs_flac,
+        tempfile.NamedTemporaryFile(delete=True) as lhs_raw,
+        tempfile.NamedTemporaryFile(delete=True) as rhs_raw,
+    ):
+        await join_tracks(tracks, Path(rhs_flac.name))
+
+        queue: asyncio.Queue[tuple[Path, Path] | None] = asyncio.Queue()
+
+        await queue.put((original.resolve(), Path(lhs_raw.name).resolve()))
+        await queue.put((Path(rhs_flac.name).resolve(), Path(rhs_raw.name).resolve()))
+
+        print(
+            'QUEUE',
+            (original.resolve(), Path(lhs_raw.name).resolve()),
+            (Path(rhs_flac.name).resolve(), Path(rhs_raw.name).resolve()),
+        )
+
+        workers = [
+            asyncio.create_task(raw_pcm_handler(queue)) for _ in range(num_workers)
+        ]
+
+        await queue.join()
+
+        for _ in range(num_workers):
+            await queue.put(None)
+
+        await asyncio.gather(*workers)
+        print('CMP', Path(lhs_raw.name).resolve(), Path(rhs_raw.name).resolve())
+        result = await cmp_raw_pcm(
+            Path(lhs_raw.name).resolve(), Path(rhs_raw.name).resolve()
+        )
+        print('RESULT', result)
+    return result

@@ -1,9 +1,10 @@
 from pathlib import Path
 
 import asyncio
+import tempfile
 
 
-async def run_cmd(cmd: list[str]) -> str:
+async def run_cmd_raw(cmd: list[str]) -> bytes:
     sub_proccess = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
@@ -15,7 +16,12 @@ async def run_cmd(cmd: list[str]) -> str:
     if sub_proccess.returncode != 0:
         raise RuntimeError()
 
-    return result.decode().strip()
+    return result
+
+
+async def run_cmd(cmd: list[str]) -> str:
+    res = await run_cmd_raw(cmd)
+    return res.decode().strip()
 
 
 async def get_duration(audio_file: Path) -> float:
@@ -78,6 +84,39 @@ async def extract_track(
         )
 
 
+async def join_tracks(tracks: list[Path], output: Path) -> None:
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        for p in tracks:
+            safe_path = p.resolve().as_posix()
+            f.write(f"file '{safe_path}'\n")
+        filelist = f.name
+
+    cmd = [
+        'ffmpeg',  # Call ffmpeg
+        '-f',
+        'concat',
+        '-safe',
+        '0',  # Disable concat safe mode
+        '-i',  # Input file
+        filelist,
+        '-c:a',
+        'flac',  # Write the result into flac
+        '-f',  # Output format
+        'flac',
+        str(output.resolve()),
+        '-y',  # Overwrite the output file if it already exists
+    ]
+    try:
+        await run_cmd(cmd)
+    except RuntimeError:
+        raise RuntimeError(f'Cant join tracks into file: {output}')
+
+    finally:
+        Path(filelist).unlink()
+
+    print('join_tracks DONE')
+
+
 async def get_raw_pcm(input: Path, output: Path) -> None:
     try:
         bit_depth = await get_bit_depth(input)
@@ -90,16 +129,44 @@ async def get_raw_pcm(input: Path, output: Path) -> None:
         'ffmpeg',  # Call ffmpeg
         '-i',  # Input file
         str(input),
-        '-f'  # Output format
+        '-f',  # Output format
         f's{bit_depth}le',
         '-acodec',  # Audio codec
         f'pcm_s{bit_depth}le',
         '-',  # Output to stdout
-        '>',  # Redirect to output file
-        str(output),
     ]
 
     try:
-        await run_cmd(cmd)
+        pcm = await run_cmd_raw(cmd)
     except RuntimeError:
         raise RuntimeError(f'Cant get raw pcm from {input} audio file')
+
+    with open(output, 'wb') as f:
+        f.write(pcm)
+
+    print('get_raw_pcm DONE')
+
+
+async def cmp_raw_pcm(lhs: Path, rhs: Path) -> bool:
+    print_file_sizes_exact(lhs, rhs)
+    cmd = [
+        'cmp',
+        str(lhs),
+        str(rhs),
+    ]
+    try:
+        res = await run_cmd(cmd)
+        print('cmp_raw_pcm DONE\n', res)
+    except RuntimeError:
+        return False
+    return True
+
+
+def print_file_sizes_exact(lhs: Path, rhs: Path) -> None:
+    """Print exact file sizes in bytes."""
+
+    def size_or_error(p: Path) -> str:
+        return f'{p.stat().st_size} bytes' if p.exists() else 'NOT FOUND'
+
+    print(f'lhs: {lhs} → {size_or_error(lhs)}')
+    print(f'rhs: {rhs} → {size_or_error(rhs)}')
