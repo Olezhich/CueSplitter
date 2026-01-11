@@ -5,9 +5,7 @@ import cuetools
 
 from cuesplitter.models import Album, Track
 
-from mutagen.flac import FLAC
-# from mutagen.flac import Picture
-# from mutagen.id3 import PictureType
+from cuesplitter.tags import set_tags
 
 import tempfile
 
@@ -23,40 +21,6 @@ async def parse_album(cue_path: Path, strict_title_case: bool) -> Album:
         )
 
     return album
-
-
-def set_tags(track_path: Path, album: Album, track: Track, cover_path: Path) -> None:
-    """add vorbis commets"""
-    f = FLAC(track_path)
-
-    f.clear()
-    f.clear_pictures()
-
-    if album.title:
-        f['ALBUM'] = album.title
-    if album.performer:
-        f['ARTIST'] = album.performer
-    if album.rem.date:
-        f['DATE'] = str(album.rem.date)
-    if album.rem.genre:
-        f['GENRE'] = album.rem.genre
-
-    if track.performer:
-        f['PERFORMER'] = track.performer
-    if track.title:
-        f['TITLE'] = track.title
-    f['TRACKNUMBER'] = f'{track.track:02d}'
-
-    # picture = Picture()
-    # picture.type = PictureType.OTHER
-    # picture.mime = 'image/jpeg'
-    # picture.desc = 'Front Cover'
-    # with open(cover_path, 'rb') as cover:
-    #     picture.data = cover.read()
-
-    # f.add_picture(picture)
-
-    f.save()
 
 
 async def track_extraction_handler(
@@ -83,7 +47,7 @@ async def track_extraction_handler(
                 await extract_track(
                     track.offset, track.duration, track.file, output_file
                 )
-                set_tags(output_file, album, track, cue_dir / 'Front.jpeg')
+                set_tags(output_file, album, track)
 
             output.append((output_file).resolve())
         finally:
@@ -129,9 +93,8 @@ async def split_album(
 
     if verify and len(album.tracks) > 0:
         res = await verify_album(output_paths, album.tracks[0].file, num_workers)
-        print('VERIFI_RESULT:', res)
-        # if not res:
-        #     raise RuntimeError('Not bit-perfect')
+        if not res:
+            raise RuntimeError('Not bit-perfect')
 
     return output_paths
 

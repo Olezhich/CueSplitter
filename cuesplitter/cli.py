@@ -47,10 +47,10 @@ def split(
         stderr.print('[bold red]Cue parse error:[/bold red]')
         stderr.print(str(e))
         raise typer.Exit(code=1)
-    # except RuntimeError as e:
-    #     stderr.print('[bold red]Runtime error:[/bold red]')
-    #     stderr.print(str(e))
-    #     raise typer.Exit(code=1)
+    except RuntimeError as e:
+        stderr.print('[bold red]Runtime error:[/bold red]')
+        stderr.print(str(e))
+        raise typer.Exit(code=1)
     if timer:
         t2 = time.time()
         stdout.print(f'[bold green]{(t2 - t1)}[/bold green]')
