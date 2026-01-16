@@ -5,10 +5,13 @@ import cuetools
 
 from cuesplitter.models.album import Album
 
+from .conftest import mock_durations
+
 
 def test_duration(cue_sample_for_durations):
     with patch(
-        'cuesplitter.models.album.get_audiofile_duration', return_value=28.0 * 60
+        'cuesplitter.models.album.get_audiofile_duration',
+        side_effect=lambda x: mock_durations[x],
     ):
         album = asyncio.run(
             Album.from_album_data(

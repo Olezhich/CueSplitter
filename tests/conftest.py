@@ -1,4 +1,9 @@
+from pathlib import Path
 import pytest
+
+mock_durations = {
+    Path('/music/scorpions/Scorpions - Lonesome Crow.flac'): 28.0 * 60,
+}
 
 
 @pytest.fixture()
