@@ -1,18 +1,29 @@
 [project]
 name = "cuesplitter"
 version = "0.1.0"
-description = ""
+description = "Lossless, bit-perfect splitting of FLAC albums using CUE sheets. PCM verification and automatic tagging."
 authors = [
     {name = "Olezhich"}
 ]
 license = {text = "MIT"}
 readme = "README.md"
+keywords = ["ffmpeg", "tags", "split", "verification", "joiner", "flac", "join", "ffmpeg-wrapper", "splitter", "bit-perfect"]
+
 requires-python = ">=3.12"
 dependencies = [
     "cuetools (>=1.0.1,<2.0.0)",
     "typer (>=0.20.1,<0.21.0)",
     "mutagen (>=1.47.0,<2.0.0)",
 ]
+
+packages = [
+    { include = "cuesplitter" }
+]
+
+[project.urls]
+Homepage = "https://github.com/Olezhich/CueSplitter"
+Repository = "https://github.com/Olezhich/CueSplitter"
+Changelog = "https://github.com/Olezhich/CueSplitter/blob/main/CHANGELOG.md"
 
 [tool.poetry]
 

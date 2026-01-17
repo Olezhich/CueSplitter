@@ -1,6 +1,7 @@
 import asyncio
 from pathlib import Path
-import subprocess
+
+from typing import Any, Awaitable, Callable
 import cuetools
 
 from cuesplitter.models import Album, Track
@@ -23,35 +24,69 @@ async def parse_album(cue_path: Path, strict_title_case: bool) -> Album:
     return album
 
 
-async def track_extraction_handler(
-    queue: asyncio.Queue[tuple[Track, Album, Path] | None],
-    output_dir: Path,
-    output: list[Path],
-    dry: bool,
+async def execute_by_workers(
+    queue: list[tuple[Any, ...]],
+    handler: Callable[..., Awaitable[Any]],
+    num_workers: int,
+) -> list[Any]:
+    """Executes all tasks in the queue using the specified number of workers. Workers take data from the queue as needed and process it with the specified handlers until the queue is empty."""
+
+    async_queue: asyncio.Queue[tuple[Any] | None] = asyncio.Queue()
+
+    for item in queue:
+        await async_queue.put(item)
+
+    output: list[Any] = []
+
+    workers = [
+        asyncio.create_task(worker(async_queue, output, handler))
+        for _ in range(num_workers)
+    ]
+
+    await async_queue.join()
+    for _ in range(num_workers):
+        await async_queue.put(None)
+
+    await asyncio.gather(*workers)
+
+    return output
+
+
+async def worker(
+    queue: asyncio.Queue[tuple[Any, ...] | None],
+    output: list[Any],
+    handler: Callable[..., Awaitable[Any]],
 ) -> None:
+    """Coroutine wrapper that allows it to work with an asynchronous queue"""
     while True:
         item = await queue.get()
         try:
             if not item:
                 break
 
-            track, album, cue_dir = item
-
-            file_name = f'{track.track:02d}'
-            if track.title:
-                file_name += f' - {track.title.replace("'", "")}.flac'
-
-            output_file = output_dir / file_name
-
-            if not dry:
-                await extract_track(
-                    track.offset, track.duration, track.file, output_file
-                )
-                set_tags(output_file, album, track)
-
-            output.append((output_file).resolve())
+            result = await handler(*item)
+            output.append(result)
         finally:
             queue.task_done()
+
+
+async def track_extraction_handler(
+    track: Track,
+    album: Album,
+    output_dir: Path,
+    dry: bool,
+) -> Path:
+    file_name = f'{track.track:02d}'
+    if track.title:
+        file_name += f' - {track.title.replace("'", "")}.flac'
+
+    output_file = output_dir / file_name
+
+    if not dry:
+        await extract_track(track.offset, track.duration, track.file, output_file)
+        set_tags(output_file, album, track)
+
+    return (output_file).resolve()
 
 
 async def split_album(
@@ -63,31 +98,15 @@ async def split_album(
     verify: bool,
 ) -> list[Path]:
     album = await parse_album(cue_path, strict_title_case)
-    cue_dir = cue_path.parent
 
     if not dry:
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    output_paths: list[Path] = []
+    queue = [(track, album, output_dir, dry) for track in album.tracks]
 
-    queue: asyncio.Queue[tuple[Track, Album, Path] | None] = asyncio.Queue()
-
-    for track in album.tracks:
-        await queue.put((track, album, cue_dir))
-
-    workers = [
-        asyncio.create_task(
-            track_extraction_handler(queue, output_dir, output_paths, dry)
-        )
-        for _ in range(num_workers)
-    ]
-
-    await queue.join()
-
-    for _ in range(num_workers):
-        await queue.put(None)
-
-    await asyncio.gather(*workers)
+    output_paths: list[Path] = await execute_by_workers(
+        queue, track_extraction_handler, num_workers
+    )
 
     output_paths = sorted(output_paths)
 
@@ -97,49 +116,6 @@ async def split_album(
             raise RuntimeError('Not bit-perfect')
 
     return output_paths
-
-
-def join_album(tracks: list[Path], output: Path) -> None:
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-        for p in tracks:
-            safe_path = p.resolve().as_posix()
-            f.write(f"file '{safe_path}'\n")
-        filelist = f.name
-    try:
-        cmd = [
-            'ffmpeg',
-            '-f',
-            'concat',
-            '-safe',
-            '0',
-            '-i',
-            filelist,
-            '-c:a',
-            'flac',
-            '-f',
-            'flac',
-            str(output.resolve()),
-            '-y',
-        ]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode != 0:
-            raise RuntimeError(f'ffmpeg failed:\n{result.stderr.decode()}')
-    finally:
-        Path(filelist).unlink()
-
-
-async def raw_pcm_handler(queue: asyncio.Queue[tuple[Path, Path] | None]) -> None:
-    while True:
-        item = await queue.get()
-        try:
-            if not item:
-                break
-
-            input, output = item
-
-            await get_raw_pcm(input, output)
-        finally:
-            queue.task_done()
 
 
 async def verify_album(tracks: list[Path], original: Path, num_workers) -> bool:
@@ -152,27 +128,13 @@ async def verify_album(tracks: list[Path], original: Path, num_workers) -> bool:
     ):
         await join_tracks(tracks, Path(rhs_flac.name))
 
-        queue: asyncio.Queue[tuple[Path, Path] | None] = asyncio.Queue()
-
-        await queue.put((original.resolve(), Path(lhs_raw.name).resolve()))
-        await queue.put((Path(rhs_flac.name).resolve(), Path(rhs_raw.name).resolve()))
-
-        print(
-            'QUEUE',
+        queue = [
             (original.resolve(), Path(lhs_raw.name).resolve()),
             (Path(rhs_flac.name).resolve(), Path(rhs_raw.name).resolve()),
-        )
-
-        workers = [
-            asyncio.create_task(raw_pcm_handler(queue)) for _ in range(num_workers)
         ]
 
-        await queue.join()
+        await execute_by_workers(queue, get_raw_pcm, num_workers)
 
-        for _ in range(num_workers):
-            await queue.put(None)
-
-        await asyncio.gather(*workers)
         print('CMP', Path(lhs_raw.name).resolve(), Path(rhs_raw.name).resolve())
         result = await cmp_raw_pcm(
             Path(lhs_raw.name).resolve(), Path(rhs_raw.name).resolve()

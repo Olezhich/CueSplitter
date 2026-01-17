@@ -1,5 +1,5 @@
 from pathlib import Path
-from cuesplitter.core import split_album, join_album, verify_album
+from cuesplitter.core import split_album, verify_album
 
 from cuetools import CueParseError, CueValidationError
 
@@ -56,24 +56,24 @@ def split(
         stdout.print(f'[bold green]{(t2 - t1)}[/bold green]')
 
 
-@app.command()
-def join(
-    tracks: list[Path],
-    output: Path = Path('joined.flac'),
-):
-    """
-    Join tracks  into a single album file
-    """
-    if not tracks:
-        stderr.print('Error: No input tracks provided.')
-        raise typer.Exit(1)
+# @app.command()
+# def join(
+#     tracks: list[Path],
+#     output: Path = Path('joined.flac'),
+# ):
+#     """
+#     Join tracks  into a single album file
+#     """
+#     if not tracks:
+#         stderr.print('Error: No input tracks provided.')
+#         raise typer.Exit(1)
 
-    for p in tracks:
-        if not p.exists():
-            stderr.print(f'Error: File not found: {p}')
-            raise typer.Exit(1)
+#     for p in tracks:
+#         if not p.exists():
+#             stderr.print(f'Error: File not found: {p}')
+#             raise typer.Exit(1)
 
-    join_album(tracks, output)
+#     join_album(tracks, output)
 
 
 @app.command()
