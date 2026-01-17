@@ -1,5 +1,6 @@
 # CueSplitter
 
+[![PyPI version](https://img.shields.io/pypi/v/cuesplitter )](https://pypi.org/project/cuesplitter/ )
 [![License](https://img.shields.io/github/license/Olezhich/CueSplitter )](https://github.com/Olezhich/CueSplitter/blob/main/LICENSE )
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://python.org)  
 [![Tests](https://github.com/Olezhich/CueSplitter/workflows/Tests/badge.svg )](https://github.com/Olezhich/CueSplitter/actions )

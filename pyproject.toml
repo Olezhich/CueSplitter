@@ -1,6 +1,6 @@
 [project]
 name = "cuesplitter"
-version = "0.1.0"
+version = "0.1.1"
 description = "Lossless, bit-perfect splitting of FLAC albums using CUE sheets. PCM verification and automatic tagging."
 authors = [
     {name = "Olezhich"}
@@ -50,3 +50,6 @@ addopts = ["--cov=cuesplitter",
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[project.scripts]
+cuesplitter = "cuesplitter.cli:app"
