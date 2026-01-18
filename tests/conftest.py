@@ -1,14 +1,21 @@
 from pathlib import Path
+from typing import Any
 import pytest
 
 mock_durations = {
     Path('/music/scorpions/Scorpions - Lonesome Crow.flac'): 28.0 * 60,
+    Path('/music/scorpions/01. Side A.flac'): 16.0 * 60,
+    Path('/music/scorpions/02. Side B.flac'): 16.0 * 60,
 }
 
 
-@pytest.fixture()
-def cue_sample_for_durations():
-    return """REM GENRE Hard Rock
+@pytest.fixture(
+    params=['one file many tracks', 'two files many tracks']
+)  # , 'one file one track'])
+def cue_sample_for_durations(request: Any):
+    match request.param:
+        case 'one file many tracks':
+            return """REM GENRE Hard Rock
 REM DATE 1972
 REM DISCID 12345678
 REM COMMENT ExactAudioCopy v1.0b3
@@ -57,4 +64,28 @@ FILE "Scorpions - Lonesome Crow.flac" WAVE
     REM REPLAYGAIN_TRACK_PEAK 1.042687
     INDEX 00 24:00:00
     INDEX 01 24:00:00
+"""
+        case 'two files many tracks':
+            return """REM GENRE "Synthpop"
+REM DATE "2020"
+PERFORMER "Various Artists"
+TITLE "Album Title"
+FILE "01. Side A.flac" WAVE
+  TRACK 01 AUDIO
+    INDEX 01 00:00:00
+  TRACK 02 AUDIO
+    INDEX 01 04:00:0
+  TRACK 03 AUDIO
+    INDEX 01 08:00:00
+  TRACK 04 AUDIO
+    INDEX 01 12:00:00
+FILE "02. Side B.flac" WAVE
+  TRACK 05 AUDIO
+    INDEX 01 00:00:00
+  TRACK 06 AUDIO
+    INDEX 01 04:00:00
+  TRACK 07 AUDIO
+    INDEX 01 08:00:00
+  TRACK 08 AUDIO
+    INDEX 01 12:00:00
 """
