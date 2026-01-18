@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- Support of case: one cue sheet, two files and many tracks.
+
 ## [0.1.1] - 2026-01-17
 
 ### Added

@@ -5,6 +5,8 @@ from cuetools import TrackData, AlbumData
 
 from cuesplitter.ffmpeg import get_duration
 
+MIN_TRACK_DURATION = 10  # (in seconds) Used to decide whether there are more tracks in the file or whether a new file should be started
+
 
 class Track(TrackData):
     duration: float  # in seconds
@@ -48,11 +50,11 @@ async def _get_offset_duration(
     offset = 0.0
     if track_cue.index00 is not None:
         offset = track_cue.index00.seconds
-    elif track_cue.index01 is not None:
+    else:
         offset = track_cue.index01.seconds
     duration = (
         next_offset - offset
-        if next_offset is not None
+        if next_offset is not None and next_offset >= MIN_TRACK_DURATION
         else await get_audiofile_duration(current_dir / track_cue.file) - offset
     )
     return offset, duration
